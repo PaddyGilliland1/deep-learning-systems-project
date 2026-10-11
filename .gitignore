@@ -23,6 +23,9 @@ datasets/
 *.ckpt
 *.safetensors
 
+# What the notebook writes when it runs: weights, epoch logs, forecasts and figures
+outputs/
+
 # Environments and secrets
 .venv/
 venv/
