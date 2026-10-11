@@ -4,3 +4,6 @@ README.md
 ALLOWLIST.txt
 requirements.txt
 deep_learning.ipynb
+data_pipeline/build_lcl_subset.py
+data_pipeline/MANIFEST.md
+lcl_2013_1000_households.csv.gz
