@@ -5,7 +5,7 @@ one CSV of half-hourly readings in kWh, and the 2013 time-of-use price signals a
 This script turns them into one row per household-day for a seeded sample of households:
 `LCLid`, `tariff_group` (the data's `Std` or `ToU`), `date`, `price_signal` (none, high, low or
 both for the time-of-use group, empty for the standard tariff group), then `r00` to `r47`, the
-day's 48 half-hourly readings as published, in GMT.
+day's 48 half-hourly readings in GMT, rounded to three decimals (step 7).
 
 Steps, each counted:
 1. drop the "Null" readings and the rows stamped off the half-hour grid;
@@ -14,7 +14,9 @@ Steps, each counted:
 4. find the households with every half-hourly reading of that year (or at most N missing), sorted
    by `LCLid`;
 5. draw the sample: np.sort(np.random.default_rng(seed).choice(pool, size, replace=False));
-6. take the SHA-256 of the sorted IDs joined by a newline, with no newline at the end.
+6. take the SHA-256 of the sorted IDs joined by a newline, with no newline at the end;
+7. round every reading in the sample to three decimals, to the nearest. The publisher's text holds
+   some readings as float32 prints them, such as 1.4529999 for 1.453. The download is not changed.
 
 The download is compressed with Deflate64, which Python's zipfile cannot open, so extract
 `CC_LCL-FullData.csv` first with a tool that handles it, such as Info-ZIP unzip or 7-Zip. The
@@ -321,6 +323,28 @@ def household_days(year_readings, sample, year, signals):
     return pd.concat([head, body], axis=1)
 
 
+def more_places(values, places=3):
+    """True for each reading that rounding to `places` decimals would change; False for an empty
+    one."""
+    values = np.asarray(values, dtype=float)
+    return ~np.isnan(values) & (np.round(values, places) != values)
+
+
+def round_readings(subset, places=3):
+    """Step 7: round every reading, r00 to r47, to `places` decimals, to the nearest, counted.
+
+    To the nearest, not up, which would move every changed reading upward. A reading that already
+    has three decimals keeps its exact value, and an empty reading stays empty. Returns the
+    rounded copy and the count of readings that changed, with the largest change in kWh."""
+    values = subset[READING_COLUMNS].to_numpy(dtype=float)
+    rounded = np.round(values, places)
+    changed = more_places(values, places)
+    out = subset.copy()
+    out[READING_COLUMNS] = rounded
+    largest = float(np.abs(rounded - values)[changed].max()) if changed.any() else 0.0
+    return out, {"readings_changed": int(changed.sum()), "largest_change": largest}
+
+
 def file_sha256(path):
     """The SHA-256 of a file's bytes, read in blocks."""
     digest = hashlib.sha256()
@@ -438,8 +462,25 @@ def manifest_text(s):
               f"| Step 5, sample, time-of-use group | {s['sample_tou']:,} |",
               f"| Step 5, first three IDs | {', '.join(s['first_ids'])} |",
               f"| Step 6, SHA-256 of the sorted IDs | `{s['sample_sha256']}` |",
+              f"| Step 7, readings the rounding changed | {s['rounding']['readings_changed']:,} |",
               f"| Output rows | {s['output_rows']:,} |",
               f"| Output readings left empty | {s['missing_readings']:,} |",
+              ""]
+
+    first = s["download_first_over"]
+    lines += ["## Rounding", "",
+              "Some readings in the published text have more than three decimal places, such as "
+              "the first of them below, which looks like a three-decimal reading stored as "
+              "float32. Step 7 rounds every reading in the sample to three decimals, to the "
+              "nearest, not up, which would move every changed reading upward. The download "
+              "itself is kept unchanged, with its hash above.", "",
+              "| Item | Value |", "|---|---|",
+              f"| Readings in the download with more than three decimals | "
+              f"{s['download_readings_over_three_places']:,} |",
+              "| The first of them in the download | "
+              + (f"{first['LCLid']}, {first['stamp']}, {first['kwh']!r} |" if first else "none |"),
+              f"| Largest change in the sample, kWh | "
+              f"{s['rounding']['largest_change']:.7f} |",
               ""]
 
     lines += ["## Price signals", "",
@@ -518,6 +559,12 @@ def main(argv=None):
 
     readings = read_lcl_csv(args.lcl_csv)
     steps = {"rows_read": len(readings), "households_read": readings["LCLid"].nunique()}
+    over = np.flatnonzero(more_places(readings["kwh"].to_numpy()))
+    first_over = None
+    if over.size:
+        row = readings.iloc[over[0]]
+        first_over = {"LCLid": str(row["LCLid"]), "stamp": str(row["stamp"]),
+                      "kwh": float(row["kwh"])}
     readings, c1 = drop_null_and_off_grid(readings)
     readings, c2 = keep_one_of_each_duplicate(readings)
     readings = keep_year(readings, args.year)
@@ -532,7 +579,7 @@ def main(argv=None):
     sample = draw_sample(pool, args.households, args.seed)
     group = (readings.groupby("LCLid", observed=True)["tariff_group"].first()
              .rename(index=str).astype(str))
-    subset = household_days(readings, sample, args.year, signals)
+    subset, rounding = round_readings(household_days(readings, sample, args.year, signals))
     out = Path(args.out)
     csv_sha = write_subset(subset, out)
     csv_bytes = csv_inside(out)[0]
@@ -552,6 +599,8 @@ def main(argv=None):
         "output_bytes": out.stat().st_size, "output_sha256": file_sha256(out),
         "output_csv_bytes": csv_bytes, "output_csv_sha256": csv_sha,
         "tariffs": tariff_summary(tariffs, gmt, signals),
+        "download_readings_over_three_places": int(over.size),
+        "download_first_over": first_over, "rounding": rounding,
     }
     if args.manifest:
         summary.update(lcl_csv=describe(args.lcl_csv), tariff_file=describe(args.tariffs),
@@ -564,6 +613,11 @@ def main(argv=None):
         print(f"{key}: {summary[key]:,}")
     print(f"first_ids: {', '.join(summary['first_ids'])}")
     print(f"sample_sha256: {summary['sample_sha256']}")
+    print(f"download readings with more than three decimals: {over.size:,}"
+          + (f" (first: {first_over['LCLid']}, {first_over['stamp']}, {first_over['kwh']!r})"
+             if first_over else ""))
+    print(f"step 7, readings the rounding changed: {rounding['readings_changed']:,} "
+          f"(largest change {rounding['largest_change']:.7f} kWh)")
     print(f"output: {out} ({summary['output_rows']:,} rows, {summary['output_bytes']:,} bytes, "
           f"{summary['output_bytes'] / 2**20:.2f} MiB)")
     print(f"output_sha256: {summary['output_sha256']}")

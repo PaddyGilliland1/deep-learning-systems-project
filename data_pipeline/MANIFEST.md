@@ -21,8 +21,8 @@ Written by `data_pipeline/build_lcl_subset.py` on 2026-10-11, with Python 3.12.3
 | `LCL-FullData.zip` (the download) | 801,674,949 | 764.54 | `68a35598cc8e70898a7651c482216fb096a0a6910c2d180c616632dfc7a9b014` |
 | `CC_LCL-FullData.csv` (extracted from the download) | 8,542,818,238 | 8,147.07 | `1df23797368237f41831434b9add6540df8a68001dabf36242d52ca41807511f` |
 | `Tariffs.xlsx` (the download) | 245,384 | 0.23 | `8a2eff6dcb737aee96cfa6c357d2947604d7f812896405c2ab5f98433d2cb150` |
-| `lcl_2013_1000_households.csv.gz` (the output) | 26,957,559 | 25.71 | `9fd762e499e60c7bc17db319282707b34864f8b9a3478dd872d9c2037a399c49` |
-| `lcl_2013_1000_households.csv` (the CSV inside the gzip) | 113,142,976 | 107.90 | `633bb9451772773a55c8c5a653a922fe73f4288e3870b1cd0b06f0d86823cc8a` |
+| `lcl_2013_1000_households.csv.gz` (the output) | 26,834,450 | 25.59 | `c38ee5df87c4c3f48bd0f5cbe8c299ca605f4ffb5ce1165fe3dea3406bf3b40c` |
+| `lcl_2013_1000_households.csv` (the CSV inside the gzip) | 112,669,998 | 107.45 | `c44d9e4988eeee2c8bcdb34575b5bf20d03100c395f5c071f294f2c0c251b842` |
 
 ## The publisher's figures beside the measured ones
 
@@ -57,8 +57,19 @@ Written by `data_pipeline/build_lcl_subset.py` on 2026-10-11, with Python 3.12.3
 | Step 5, sample, time-of-use group | 219 |
 | Step 5, first three IDs | MAC000006, MAC000010, MAC000018 |
 | Step 6, SHA-256 of the sorted IDs | `b8700c6c0b681e278833fe87b4fdfad0ffe3ecc3fd5799b8a55803fc37dec06c` |
+| Step 7, readings the rounding changed | 115,323 |
 | Output rows | 365,000 |
 | Output readings left empty | 0 |
+
+## Rounding
+
+Some readings in the published text have more than three decimal places, such as the first of them below, which looks like a three-decimal reading stored as float32. Step 7 rounds every reading in the sample to three decimals, to the nearest, not up, which would move every changed reading upward. The download itself is kept unchanged, with its hash above.
+
+| Item | Value |
+|---|---|
+| Readings in the download with more than three decimals | 1,015,466 |
+| The first of them in the download | MAC000002, 2012-10-20 18:00:00, 1.4529999 |
+| Largest change in the sample, kWh | 0.0000005 |
 
 ## Price signals
 
