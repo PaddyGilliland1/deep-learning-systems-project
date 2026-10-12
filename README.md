@@ -20,8 +20,9 @@
   `data_pipeline/MANIFEST.md` before it uses it.
 - Price schedule: `lcl_2013_price_schedule.csv`, beside the working file, 466,443 bytes, SHA-256
   `766106ad7cafe2db3a9195f8d603ddfa2c092c3743b1625ad365dc2aac9a8e39`. It is the same data set, not
-  a join: the half-hourly tariff from the download's own `Tariffs.xlsx`, written by the same
-  pipeline. Task 5 reads it for one extra view.
+  a join: the half-hourly tariff from `Tariffs.xlsx`, a separate file on the same London Datastore
+  page as the readings and part of the same data set, not inside the readings zip. The same
+  pipeline writes it, and Task 5 reads it for one extra view.
 
 The working file holds 1,000 households drawn with seed 42 from the 1,132 households with every
 2013 reading: one row per household-day, 365,000 rows. Each row gives the household (`LCLid`),
