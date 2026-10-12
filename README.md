@@ -90,8 +90,8 @@ These steps assume Python 3 and Git are installed. The notebook was built with P
    ```
 
 The notebook trains both models every time it runs. On an NVIDIA GeForce RTX 5090 the last full
-run spent 21.4 minutes training. With no GPU visible the same code runs on the CPU, and
-Task 5's timing table estimates that at about 49.5 hours, scaled from the median of 20 timed
+run spent 21.2 minutes training. With no GPU visible the same code runs on the CPU, and
+Task 5's timing table estimates that at about 45.7 hours, scaled from the median of 20 timed
 training steps of each model on this rig's CPU, with PyTorch fixed at 16 threads. Its first
 code cell pins the first GPU and sets the seeds and the settings that make a rerun repeat its
 numbers. Running the notebook writes the trained weights, the epoch logs, the forecasts and the
