@@ -2,7 +2,14 @@
 
 ## Project description
 
-[TO WRITE: two to four sentences in your own words: what you built and the dataset you used.]
+**What I built:** I forecast a London household's electricity use for the next 24 hours, which is 48
+half-hourly meter readings, from its previous seven days.
+
+**The models:** I compared a long short-term memory (LSTM) network with the same network built from
+gated recurrent unit (GRU) layers.
+
+**The data:** I used Low Carbon London smart meter data from UK Power Networks, for 1,000 households
+with a complete 2013 record.
 
 ## Dataset
 
