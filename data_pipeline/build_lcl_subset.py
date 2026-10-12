@@ -19,9 +19,9 @@ Steps, each counted:
    some readings as float32 prints them, such as 1.4529999 for 1.453. The download is not changed.
 
 Beside the subset it writes the price schedule, `lcl_2013_price_schedule.csv`: the tariff of each
-GMT half-hour, High, Low or Normal, from the same download's Tariffs.xlsx moved to GMT. Where the
-move gives a half-hour two rows, which agree, one is kept; a half-hour it leaves with none has no
-row.
+GMT half-hour, High, Low or Normal, from Tariffs.xlsx, a separate file on the same London Datastore
+page as the readings, moved to GMT. Where the move gives a half-hour two rows, which agree, one is
+kept; a half-hour it leaves with none has no row.
 
 The download is compressed with Deflate64, which Python's zipfile cannot open, so extract
 `CC_LCL-FullData.csv` first with a tool that handles it, such as Info-ZIP unzip or 7-Zip. The
