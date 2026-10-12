@@ -122,7 +122,7 @@ PyTorch 2.14.1 publishes no build for macOS on Intel, so this route does not wor
 
 The notebook trains both models every time it runs. On an NVIDIA GeForce RTX 5090 the last full
 run spent 21.2 minutes training. With no graphics processing unit (GPU) visible the same code
-runs on the CPU, and Task 5's timing table estimates that at about 45.7 hours, scaled from the median of 20 timed
+runs on the CPU, and Task 5's timing table estimates that at about 50.7 hours, scaled from the median of 20 timed
 training steps of each model on this rig's CPU, with PyTorch fixed at 16 threads. This rig's CPU
 is an Intel Core Ultra 9 285K. The notebook's first code cell pins the first GPU and sets the
 seeds and the settings that make a rerun repeat its numbers. Running the notebook writes the
