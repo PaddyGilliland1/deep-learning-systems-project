@@ -18,11 +18,23 @@
   It is a gzip copy of the working CSV, which is 112,669,998 bytes and so over GitHub's 100 MiB
   file limit. `pandas.read_csv` reads the gzip directly, and the notebook checks its hash against
   `data_pipeline/MANIFEST.md` before it uses it.
+- Price schedule: `lcl_2013_price_schedule.csv`, beside the working file, 466,443 bytes, SHA-256
+  `766106ad7cafe2db3a9195f8d603ddfa2c092c3743b1625ad365dc2aac9a8e39`. It is the same data set, not
+  a join: the half-hourly tariff from the download's own `Tariffs.xlsx`, written by the same
+  pipeline. Task 5 reads it for one extra view.
 
 The working file holds 1,000 households drawn with seed 42 from the 1,132 households with every
 2013 reading: one row per household-day, 365,000 rows. Each row gives the household (`LCLid`),
 its tariff group (`Std` or `ToU`), the date, the time-of-use group's price signal for that day,
 and the day's 48 half-hourly readings in kWh, `r00` to `r47`.
+
+The price schedule holds one row per GMT half-hour of 2013: `stamp`, and `tariff`, the price signal
+the time-of-use group was given for that half-hour (`High`, `Low` or `Normal`). The tariff file
+appears to follow the UK local clock (inferred from when the time-of-use households change their
+use; neither file says so), so the pipeline moves its summer stamps one hour back to the readings'
+GMT stamps. That move gives 2013-03-31 01:00 and 01:30 two rows each, both `Normal`, and one of each
+is kept. It leaves 2013-10-27 01:00 and 01:30 with none, and they are left out. So the schedule
+holds 17,518 rows, not 17,520.
 
 ### Rebuilding the working file
 
@@ -36,7 +48,8 @@ and the day's 48 half-hourly readings in kWh, `r00` to `r47`.
    python data_pipeline/build_lcl_subset.py --lcl-csv CC_LCL-FullData.csv --tariffs Tariffs.xlsx
    ```
 
-With its defaults it rebuilds `lcl_2013_1000_households.csv.gz` byte for byte.
+With its defaults it rebuilds `lcl_2013_1000_households.csv.gz` byte for byte, and writes
+`lcl_2013_price_schedule.csv` beside it, also byte for byte.
 `data_pipeline/MANIFEST.md` gives the sizes and SHA-256 hashes of the download, the extracted CSV
 and the output, and the count after each step.
 

@@ -18,6 +18,11 @@ Steps, each counted:
 7. round every reading in the sample to three decimals, to the nearest. The publisher's text holds
    some readings as float32 prints them, such as 1.4529999 for 1.453. The download is not changed.
 
+Beside the subset it writes the price schedule, `lcl_2013_price_schedule.csv`: the tariff of each
+GMT half-hour, High, Low or Normal, from the same download's Tariffs.xlsx moved to GMT. Where the
+move gives a half-hour two rows, which agree, one is kept; a half-hour it leaves with none has no
+row.
+
 The download is compressed with Deflate64, which Python's zipfile cannot open, so extract
 `CC_LCL-FullData.csv` first with a tool that handles it, such as Info-ZIP unzip or 7-Zip. The
 standard library and pandas are all it needs (NumPy comes with pandas); the xlsx is read with
@@ -25,9 +30,10 @@ zipfile and xml.etree.
 
     python data_pipeline/build_lcl_subset.py --lcl-csv CC_LCL-FullData.csv --tariffs Tariffs.xlsx
 
-The defaults rebuild the submitted file byte for byte. --year, --households, --seed and --pool
-adapt it. An at-most-N pool leaves empty readings that the notebook does not fill, and the price
-signals exist for 2013 only, so in any other year `price_signal` is empty.
+The defaults rebuild the submitted file and the price schedule byte for byte. --year,
+--households, --seed and --pool adapt it. An at-most-N pool leaves empty readings that the notebook
+does not fill, and the price signals exist for 2013 only, so in any other year `price_signal` is
+empty.
 """
 
 import argparse
@@ -51,6 +57,7 @@ DEFAULT_HOUSEHOLDS = 1000
 DEFAULT_SEED = 42
 DEFAULT_POOL = "strict"
 DEFAULT_OUTPUT = "lcl_2013_1000_households.csv.gz"
+DEFAULT_SCHEDULE = "lcl_2013_price_schedule.csv"
 
 LCL_HEADER = ["LCLid", "stdorToU", "DateTime", "KWH/hh (per half hour) "]
 TARIFF_HEADER = ("TariffDateTime", "Tariff")
@@ -195,6 +202,22 @@ def day_price_signals(tariffs_gmt):
     low = (tariffs_gmt["tariff"] == "Low").groupby(day).any()
     label = np.select([high & low, high, low], ["both", "high", "low"], default="none")
     return pd.Series(label, index=high.index.rename(None), dtype=object)
+
+
+def half_hour_schedule(tariffs_gmt):
+    """The price schedule: one row per GMT half-hour the tariff rows cover, columns stamp and
+    tariff, in time order. Where the move to GMT gives a half-hour two rows that agree, one is
+    kept; two that differ stop the build, because no rule says which to keep. A half-hour the
+    move leaves with no row is left out."""
+    unknown = set(tariffs_gmt["tariff"]) - TARIFF_LABELS
+    if unknown:
+        raise ValueError(f"tariff values outside {sorted(TARIFF_LABELS)}: {sorted(unknown)}")
+    kinds = tariffs_gmt.groupby("stamp")["tariff"].nunique()
+    if (kinds > 1).any():
+        raise ValueError(f"{int((kinds > 1).sum())} GMT half-hours carry different tariffs; no "
+                         "rule says which to keep, so the build stops")
+    one = tariffs_gmt.drop_duplicates("stamp").sort_values("stamp", kind="stable")
+    return one[["stamp", "tariff"]].reset_index(drop=True)
 
 
 # --- the readings -------------------------------------------------------------------------------
@@ -375,6 +398,14 @@ def write_subset(subset, path):
     return csv_inside(path)[1]
 
 
+def write_schedule(schedule, path):
+    """Write the price schedule as a plain CSV with Unix line ends, each stamp as
+    YYYY-MM-DD HH:MM:SS, and return its SHA-256. The same tariff file rewrites it byte for byte."""
+    text = schedule.assign(stamp=schedule["stamp"].dt.strftime("%Y-%m-%d %H:%M:%S"))
+    text.to_csv(path, index=False, lineterminator="\n")
+    return file_sha256(path)
+
+
 # --- the manifest -------------------------------------------------------------------------------
 
 PUBLISHER_FIGURES = {
@@ -422,6 +453,8 @@ def manifest_text(s):
     if out_name.endswith(".gz"):
         lines.append(file_row(f"`{out_name[:-3]}` (the CSV inside the gzip)",
                               s["output_csv_bytes"], s["output_csv_sha256"]))
+    lines.append(file_row(f"`{s['schedule']['name']}` (the price schedule)",
+                          s["schedule"]["bytes"], s["schedule"]["sha256"]))
     lines.append("")
 
     csv_bytes = s["lcl_csv"]["bytes"]
@@ -497,12 +530,17 @@ def manifest_text(s):
               f"| Days with a Low signal, GMT | {tf['gmt_days_low']:,} |",
               f"| Days with both, GMT | {tf['gmt_days_both']:,} |",
               f"| Days with either, GMT | {tf['gmt_days_either']:,} |",
+              f"| Half-hours in the price schedule | {s['schedule']['rows']:,} |",
               "",
               "GMT half-hours that get two tariff rows or none after the move:", "",
               "| GMT half-hour | Tariff rows | Values |", "|---|---|---|"]
     lines += [f"| {f['stamp']} | {f['signals']} | {f['tariffs'] or 'none'} |"
               for f in tf["faults"]] or ["| none | | |"]
-    lines.append("")
+    lines += ["",
+              "The price schedule keeps one row for each half-hour above that gets two tariff "
+              "rows, since the build stops unless they agree, and has no row for a half-hour that "
+              "gets none.",
+              ""]
     return "\n".join(lines)
 
 
@@ -538,7 +576,8 @@ def parse_args(argv):
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--pool", default=DEFAULT_POOL, help='"strict" or "at-most-N"')
     parser.add_argument("--out", default=str(REPO / DEFAULT_OUTPUT),
-                        help="a .csv or .csv.gz path (default: the submitted file)")
+                        help="a .csv or .csv.gz path (default: the submitted file); the price "
+                        "schedule is written beside it")
     parser.add_argument("--manifest", help="also write the manifest here")
     parser.add_argument("--zip", help="the downloaded zip, hashed for the manifest")
     parser.add_argument("--downloaded", help="the download date, for the manifest")
@@ -556,6 +595,7 @@ def main(argv=None):
     tariffs = read_tariffs(args.tariffs)
     gmt = tariffs_to_gmt(tariffs)
     signals = day_price_signals(gmt)
+    schedule = half_hour_schedule(gmt)
 
     readings = read_lcl_csv(args.lcl_csv)
     steps = {"rows_read": len(readings), "households_read": readings["LCLid"].nunique()}
@@ -583,6 +623,8 @@ def main(argv=None):
     out = Path(args.out)
     csv_sha = write_subset(subset, out)
     csv_bytes = csv_inside(out)[0]
+    schedule_path = out.parent / DEFAULT_SCHEDULE
+    schedule_sha = write_schedule(schedule, schedule_path)
 
     summary = {
         "built": dt.date.today().isoformat(), "python": platform.python_version(),
@@ -601,6 +643,9 @@ def main(argv=None):
         "tariffs": tariff_summary(tariffs, gmt, signals),
         "download_readings_over_three_places": int(over.size),
         "download_first_over": first_over, "rounding": rounding,
+        "schedule": {"name": schedule_path.name, "path": str(schedule_path),
+                     "rows": len(schedule), "bytes": schedule_path.stat().st_size,
+                     "sha256": schedule_sha},
     }
     if args.manifest:
         summary.update(lcl_csv=describe(args.lcl_csv), tariff_file=describe(args.tariffs),
@@ -622,6 +667,8 @@ def main(argv=None):
           f"{summary['output_bytes'] / 2**20:.2f} MiB)")
     print(f"output_sha256: {summary['output_sha256']}")
     print(f"output_csv: {csv_bytes:,} bytes, {csv_bytes / 2**20:.2f} MiB, sha256 {csv_sha}")
+    print(f"price schedule: {schedule_path} ({len(schedule):,} half-hours, "
+          f"{summary['schedule']['bytes']:,} bytes), sha256 {schedule_sha}")
     for fault in summary["tariffs"]["faults"]:
         print(f"tariff half-hour with {fault['signals']} rows: {fault['stamp']} "
               f"({fault['tariffs'] or 'none'})")

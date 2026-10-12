@@ -1,6 +1,6 @@
 # Manifest: the Low Carbon London working subset
 
-Written by `data_pipeline/build_lcl_subset.py` on 2026-10-11, with Python 3.12.3, pandas 3.0.6 and NumPy 2.5.4. Year 2013, 1,000 households, seed 42, pool `strict`.
+Written by `data_pipeline/build_lcl_subset.py` on 2026-10-12, with Python 3.12.3, pandas 3.0.6 and NumPy 2.5.4. Year 2013, 1,000 households, seed 42, pool `strict`.
 
 ## Source
 
@@ -23,6 +23,7 @@ Written by `data_pipeline/build_lcl_subset.py` on 2026-10-11, with Python 3.12.3
 | `Tariffs.xlsx` (the download) | 245,384 | 0.23 | `8a2eff6dcb737aee96cfa6c357d2947604d7f812896405c2ab5f98433d2cb150` |
 | `lcl_2013_1000_households.csv.gz` (the output) | 26,834,450 | 25.59 | `c38ee5df87c4c3f48bd0f5cbe8c299ca605f4ffb5ce1165fe3dea3406bf3b40c` |
 | `lcl_2013_1000_households.csv` (the CSV inside the gzip) | 112,669,998 | 107.45 | `c44d9e4988eeee2c8bcdb34575b5bf20d03100c395f5c071f294f2c0c251b842` |
+| `lcl_2013_price_schedule.csv` (the price schedule) | 466,443 | 0.44 | `766106ad7cafe2db3a9195f8d603ddfa2c092c3743b1625ad365dc2aac9a8e39` |
 
 ## The publisher's figures beside the measured ones
 
@@ -86,6 +87,7 @@ The tariff file appears to follow the UK local clock (inferred from when the tim
 | Days with a Low signal, GMT | 104 |
 | Days with both, GMT | 28 |
 | Days with either, GMT | 153 |
+| Half-hours in the price schedule | 17,518 |
 
 GMT half-hours that get two tariff rows or none after the move:
 
@@ -95,3 +97,5 @@ GMT half-hours that get two tariff rows or none after the move:
 | 2013-03-31 01:30:00 | 2 | Normal, Normal |
 | 2013-10-27 01:00:00 | 0 | none |
 | 2013-10-27 01:30:00 | 0 | none |
+
+The price schedule keeps one row for each half-hour above that gets two tariff rows, since the build stops unless they agree, and has no row for a half-hour that gets none.
