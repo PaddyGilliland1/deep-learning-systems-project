@@ -23,6 +23,9 @@ datasets/
 *.ckpt
 *.safetensors
 
+# What the notebook writes when it runs: weights, epoch logs, forecasts and figures
+outputs/
+
 # Environments and secrets
 .venv/
 venv/
@@ -42,3 +45,5 @@ __pycache__/
 Thumbs.db
 
 # PDF files are not ignored: the report PDF is a deliverable.
+!lcl_2013_1000_households.csv.gz
+!lcl_2013_price_schedule.csv

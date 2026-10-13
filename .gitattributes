@@ -1,0 +1,4 @@
+# The README and the manifest give these files' sizes and hashes, so git never changes their
+# line endings.
+*.csv -text
+*.gz binary
